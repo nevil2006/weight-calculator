@@ -1,0 +1,151 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+class ConverterApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Multi-Page Unit Converter")
+        self.geometry("600x400")
+        self.configure(bg="#f0f0f0")
+
+        self.style = ttk.Style(self)
+        self.style.theme_use('clam')
+        self.style.configure('TLabel', background="#f0f0f0", font=('Arial', 12))
+        self.style.configure('TButton', font=('Arial', 12, 'bold'))
+        self.style.configure('TFrame', background="#f0f0f0")
+
+        self.categories = {
+            "Weight": {
+                "Kilograms to Pounds": lambda x: x * 2.20462,
+                "Pounds to Kilograms": lambda x: x / 2.20462,
+                "Grams to Ounces": lambda x: x / 28.34952,
+                "Ounces to Grams": lambda x: x * 28.34952
+            },
+            "Length": {
+                "Meters to Feet": lambda x: x * 3.28084,
+                "Feet to Meters": lambda x: x / 3.28084,
+                "Kilometers to Miles": lambda x: x * 0.621371,
+                "Miles to Kilometers": lambda x: x / 0.621371
+            },
+            "Temperature": {
+                "Celsius to Fahrenheit": lambda x: (x * 9/5) + 32,
+                "Fahrenheit to Celsius": lambda x: (x - 32) * 5/9,
+                "Celsius to Kelvin": lambda x: x + 273.15,
+                "Kelvin to Celsius": lambda x: x - 273.15
+            }
+        }
+
+        container = ttk.Frame(self)
+        container.pack(fill="both", expand=True)
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
+
+        self.frames = {}
+        for F in (FrontPage, HomePage, ResultPage):
+            frame = F(container, self)
+            self.frames[F] = frame
+            frame.grid(row=0, column=0, sticky="nsew")
+
+        self.show_frame(FrontPage)
+
+    def show_frame(self, cont):
+        frame = self.frames[cont]
+        frame.tkraise()
+
+class FrontPage(ttk.Frame):
+    def __init__(self, parent, controller):
+        ttk.Frame.__init__(self, parent)
+        self.controller = controller
+
+        center_frame = ttk.Frame(self)
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        label = ttk.Label(center_frame, text="Welcome to Unit Converter", font=('Arial', 24, 'bold'))
+        label.pack(pady=20)
+
+        start_button = ttk.Button(center_frame, text="Start Converting", command=self.go_to_home)
+        start_button.pack(pady=20)
+
+    def go_to_home(self):
+        self.controller.show_frame(HomePage)
+
+class HomePage(ttk.Frame):
+    def __init__(self, parent, controller):
+        ttk.Frame.__init__(self, parent)
+        self.controller = controller
+
+        center_frame = ttk.Frame(self)
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        label = ttk.Label(center_frame, text="Select Conversion", font=('Arial', 18, 'bold'))
+        label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+
+        ttk.Label(center_frame, text="Category:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        self.category_var = tk.StringVar()
+        self.category_combo = ttk.Combobox(center_frame, textvariable=self.category_var, values=list(controller.categories.keys()), state="readonly", width=25)
+        self.category_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.category_combo.bind("<<ComboboxSelected>>", self.update_conversions)
+
+        ttk.Label(center_frame, text="Conversion:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        self.conversion_var = tk.StringVar()
+        self.conversion_combo = ttk.Combobox(center_frame, textvariable=self.conversion_var, state="readonly", width=25)
+        self.conversion_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+        ttk.Label(center_frame, text="Value:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        self.value_var = tk.StringVar()
+        self.value_entry = ttk.Entry(center_frame, textvariable=self.value_var, width=27)
+        self.value_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+
+        convert_button = ttk.Button(center_frame, text="Convert", command=self.convert)
+        convert_button.grid(row=4, column=0, columnspan=2, pady=20)
+
+    def update_conversions(self, event=None):
+        category = self.category_var.get()
+        self.conversion_combo['values'] = list(self.controller.categories[category].keys())
+        self.conversion_combo.set('')
+
+    def convert(self):
+        try:
+            category = self.category_var.get()
+            conversion = self.conversion_var.get()
+            value = float(self.value_var.get())
+
+            result = self.controller.categories[category][conversion](value)
+            
+            result_page = self.controller.frames[ResultPage]
+            result_page.set_result(category, conversion, value, result)
+            self.controller.show_frame(ResultPage)
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid number")
+        except KeyError:
+            messagebox.showerror("Error", "Please select both a category and a conversion")
+
+class ResultPage(ttk.Frame):
+    def __init__(self, parent, controller):
+        ttk.Frame.__init__(self, parent)
+        self.controller = controller
+
+        center_frame = ttk.Frame(self)
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        self.result_label = ttk.Label(center_frame, text="", font=('Arial', 16), justify="center")
+        self.result_label.pack(pady=(0, 20))
+
+        back_button = ttk.Button(center_frame, text="Convert Another", command=self.go_to_home)
+        back_button.pack(pady=10)
+
+    def set_result(self, category, conversion, value, result):
+        if category == "Temperature":
+            formatted_result = f"{result:.2f}°"
+        else:
+            formatted_result = f"{result:.4f}"
+        
+        self.result_label.config(text=f"{value} {conversion.split(' to ')[0]}\nis equal to\n{formatted_result} {conversion.split(' to ')[1]}")
+
+    def go_to_home(self):
+        self.controller.show_frame(HomePage)
+
+if __name__ == "__main__":
+    app = ConverterApp()
+    app.mainloop()
